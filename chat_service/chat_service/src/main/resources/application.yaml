@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: chat_service
+  data:
+    mongodb:
+      uri: mongodb://root:root@localhost:27017/chat-service?authSource=admin
+      auto-index-creation: true
+
+server:
+  port: 8085
+  servlet:
+    context-path: /chat
+
+app:
+  service:
+    identity: http://localhost:8080/identity
+    profile: http://localhost:8081/profile/info
+    notification: http://localhost:8082/notification
