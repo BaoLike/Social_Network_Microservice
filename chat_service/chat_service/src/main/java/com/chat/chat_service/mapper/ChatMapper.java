@@ -9,13 +9,20 @@ import org.springframework.stereotype.Component;
 public class ChatMapper {
 
     public ChatMessageResponse convertFromChatMessage (ChatMessage chatMessage){
-
-
         return  ChatMessageResponse.builder()
+                .id(chatMessage.getId())
                 .conversationId(chatMessage.getConversationId())
                 .message(chatMessage.getMessage())
+                .iv(chatMessage.getIv())
+                .encrypted(chatMessage.isEncrypted())
+                .e2e(chatMessage.isE2e())
                 .sender(chatMessage.getSender())
                 .createdDate(chatMessage.getCreatedDate())
+                .recalled(chatMessage.isRecalled())
+                .recalledByLastName(chatMessage.getRecalledByLastName())
+                .recalledAt(chatMessage.getRecalledAt())
+                .storyReplyMediaUrl(chatMessage.getStoryReplyMediaUrl())
+                .storyReplyOwnerId(chatMessage.getStoryReplyOwnerId())
                 .build();
     }
 

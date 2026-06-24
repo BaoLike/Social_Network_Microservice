@@ -14,7 +14,13 @@ public enum ErrorCode {
     TOKEN_NOT_FOUND(1010 , "Refresh token not found in DB" , HttpStatus.BAD_REQUEST),
     TOKEN_REVOKED(1011 , "Token exists in blacklists" , HttpStatus.BAD_REQUEST),
      VERIFY_EMAIL_TOKEN_INVALID(1012 , "Email token invalid" , HttpStatus.NOT_FOUND),
-    EMAIL_NOT_VERIFIED(1013 , "Email not yet verify" , HttpStatus.NOT_FOUND)
+    EMAIL_NOT_VERIFIED(1013 , "Email chưa được xác thực. Vui lòng nhập mã OTP đã gửi về email." , HttpStatus.FORBIDDEN),
+    ACCOUNT_LOCKED(1014 , "Tài khoản đã bị khóa do vi phạm chính sách cộng đồng" , HttpStatus.FORBIDDEN),
+    OTP_INVALID(1015 , "Mã OTP không đúng" , HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(1016 , "Mã OTP đã hết hạn. Vui lòng gửi lại mã mới." , HttpStatus.BAD_REQUEST),
+    EMAIL_SEND_FAILED(1017 , "Không thể gửi email xác thực. Vui lòng thử lại sau." , HttpStatus.INTERNAL_SERVER_ERROR),
+    PASSWORD_INVALID(1018 , "Mật khẩu mới phải có ít nhất 6 ký tự" , HttpStatus.BAD_REQUEST),
+    PASSWORD_RESET_TOKEN_INVALID(1019 , "Không tìm thấy yêu cầu đặt lại mật khẩu. Vui lòng gửi lại mã OTP." , HttpStatus.BAD_REQUEST)
 
 
 

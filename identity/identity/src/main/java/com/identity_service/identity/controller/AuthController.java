@@ -4,6 +4,10 @@ import com.identity_service.identity.dto.request.AuthRequest;
 import com.identity_service.identity.dto.request.IntroSpectRequest;
 import com.identity_service.identity.dto.request.LogOutRequest;
 import com.identity_service.identity.dto.request.RefreshTokenRequest;
+import com.identity_service.identity.dto.request.ForgotPasswordRequest;
+import com.identity_service.identity.dto.request.ResetPasswordRequest;
+import com.identity_service.identity.dto.request.ResendOtpRequest;
+import com.identity_service.identity.dto.request.VerifyEmailOtpRequest;
 import com.identity_service.identity.dto.response.ApiResponse;
 import com.identity_service.identity.dto.response.AuthResponse;
 import com.identity_service.identity.dto.response.IntroSpectResponse;
@@ -65,6 +69,38 @@ public class AuthController {
         authService.verifyEmail(token);
         return ApiResponse.<Void>
                 builder()
+                .build();
+    }
+
+    @PostMapping("/verify_email_otp")
+    public ApiResponse<Void> verifyEmailOtp(@RequestBody VerifyEmailOtpRequest request) {
+        authService.verifyEmailOtp(request);
+        return ApiResponse.<Void>builder()
+                .message("Xác thực email thành công")
+                .build();
+    }
+
+    @PostMapping("/resend_otp")
+    public ApiResponse<Void> resendOtp(@RequestBody ResendOtpRequest request) {
+        authService.resendOtp(request);
+        return ApiResponse.<Void>builder()
+                .message("Đã gửi lại mã OTP")
+                .build();
+    }
+
+    @PostMapping("/forgot_password")
+    public ApiResponse<Void> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ApiResponse.<Void>builder()
+                .message("Nếu email tồn tại, mã OTP đặt lại mật khẩu đã được gửi")
+                .build();
+    }
+
+    @PostMapping("/reset_password")
+    public ApiResponse<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ApiResponse.<Void>builder()
+                .message("Đặt lại mật khẩu thành công")
                 .build();
     }
 

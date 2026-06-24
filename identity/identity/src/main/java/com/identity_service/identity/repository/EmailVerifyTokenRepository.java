@@ -9,4 +9,8 @@ import java.util.Optional;
 @Repository
 public interface EmailVerifyTokenRepository extends JpaRepository<com.identity_service.identity.model.entity.EmailVerifyToken , String> {
     Optional<EmailVerifyToken> findByEmailVerifyToken(String emailVerifyToken);
+
+    Optional<EmailVerifyToken> findFirstByUsers_UserIdOrderByExpiredAtDesc(String userId);
+
+    void deleteByUsers_UserId(String userId);
 }

@@ -24,8 +24,24 @@ public class ChatMessage {
 
     String message;
 
+    String iv;
+
+    boolean encrypted;
+
+    boolean e2e;
+
     ParticipantInfo sender;
 
     @Indexed
     Instant createdDate;
+
+    boolean recalled;
+
+    String recalledByLastName;
+
+    Instant recalledAt;
+
+    String storyReplyMediaUrl;
+
+    String storyReplyOwnerId;
 }

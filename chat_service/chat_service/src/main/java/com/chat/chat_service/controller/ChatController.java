@@ -35,4 +35,11 @@ public class ChatController {
                 .build();
     }
 
+    @PutMapping("/{messageId}/recall")
+    ApiResponse<ChatMessageResponse> recallMessage(@PathVariable String messageId) {
+        return ApiResponse.<ChatMessageResponse>builder()
+                .result(chatMessageService.recallMessage(messageId))
+                .build();
+    }
+
 }

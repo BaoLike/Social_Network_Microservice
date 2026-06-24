@@ -8,32 +8,76 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="common" />
-        <module name="api-gateway" />
+      </profile>
+      <profile name="Annotation profile for notification_service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.34/lombok-1.18.34.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.34/lombok-1.18.34.jar" />
+        </processorPath>
         <module name="notification_service" />
       </profile>
-      <profile name="Annotation profile for demo" enabled="true">
+      <profile name="Annotation profile for profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.44/lombok-1.18.44.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.44/lombok-1.18.44.jar" />
+        </processorPath>
+        <module name="profile" />
+        <module name="chat_service" />
+        <module name="PostService" />
+      </profile>
+      <profile name="Annotation profile for story" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.44/lombok-1.18.44.jar" />
         </processorPath>
-        <module name="chat_service" />
+        <module name="call_service" />
         <module name="demo" />
         <module name="identity" />
-        <module name="profile" />
+        <module name="story" />
+      </profile>
+      <profile name="Annotation profile for api-gateway" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.32/lombok-1.18.32.jar" />
+        </processorPath>
+        <module name="api-gateway" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="chat_service (1)" target="1.8" />
+      <module name="identity (1)" target="1.8" />
+      <module name="notification_service (1)" target="1.8" />
+      <module name="profile (1)" target="1.8" />
+      <module name="story_service" target="21" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="PostService" options="-parameters" />
       <module name="api-gateway" options="-parameters" />
+      <module name="call_service" options="-parameters" />
       <module name="chat_service" options="-parameters" />
+      <module name="chat_service (1)" options="-parameters" />
       <module name="common" options="-parameters" />
       <module name="demo" options="-parameters" />
       <module name="identity" options="-parameters" />
+      <module name="identity (1)" options="-parameters" />
       <module name="notification_service" options="-parameters" />
+      <module name="notification_service (1)" options="-parameters" />
       <module name="profile" options="-parameters" />
+      <module name="profile (1)" options="-parameters" />
+      <module name="story" options="-parameters" />
+      <module name="story_service" options="-parameters" />
     </option>
   </component>
 </project>

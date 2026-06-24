@@ -16,6 +16,16 @@ public class ChatMessageResponse {
     String conversationId;
     boolean me;
     String message;
+    String iv;
+    boolean encrypted;
+    boolean e2e;
     ParticipantInfo sender;
     Instant createdDate;
+    boolean recalled;
+    String recalledByLastName;
+    Instant recalledAt;
+
+    String storyReplyMediaUrl;
+
+    String storyReplyOwnerId;
 }

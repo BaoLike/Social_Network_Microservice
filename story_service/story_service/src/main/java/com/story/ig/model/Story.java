@@ -28,6 +28,15 @@ public class Story extends BaseAuditEntity {
     @Field("url_media")
     private String urlMedia;
 
+    @Field("avatar")
+    private String avatar;
+
+    @Field("first_name")
+    private String firstName;
+
+    @Field("lastName")
+    private String lastName;
+
     @Field("liked")
     private Long liked;
 

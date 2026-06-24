@@ -20,4 +20,13 @@ public class UserStories {
 
     @Field("list_stories")
     private List<Story> listStories;
+
+    @Field("first_name")
+    private String firstName;
+
+    @Field("last_name")
+    private String lastName;
+
+    @Field("avatar")
+    private String avatar;
 }

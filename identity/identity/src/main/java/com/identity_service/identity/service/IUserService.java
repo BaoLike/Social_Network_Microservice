@@ -7,4 +7,5 @@ public interface IUserService {
     UserResponse createUser(UserCreationRequest request);
     UserResponse getUser (String userId);
     void deleteUser (String userId);
+    void lockUser (String userId);
 }

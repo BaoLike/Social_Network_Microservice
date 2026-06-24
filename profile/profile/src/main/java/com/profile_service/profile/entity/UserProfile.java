@@ -25,6 +25,12 @@ public class UserProfile {
     @Property("userId")
     String userId;
 
+    @Property("userName")
+    String userName;
+
+    @Property("avatar")
+    String avatar;
+
     @Property("firstName")
     String firstName;
 
@@ -42,4 +48,7 @@ public class UserProfile {
 
     @Property("phone")
     String phone;
+
+    @Property("publicKey")
+    String publicKey;
 }

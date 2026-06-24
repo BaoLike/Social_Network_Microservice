@@ -1,0 +1,19 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://postgres:5432/social_network_identity
+  data:
+    redis:
+      host: ${REDIS_HOST:redis-14597.c291.ap-southeast-2-1.ec2.cloud.redislabs.com}
+      port: ${REDIS_PORT:14597}
+      password: ${REDIS_PASSWORD:}
+      username: ${REDIS_USERNAME:default}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+
+app:
+  services:
+    profile: http://profile:8081/profile/info
+    notify: http://notification:8082/notification

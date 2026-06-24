@@ -1,0 +1,23 @@
+# Optional TURN server for WebRTC when devices are on different networks (4G, NAT).
+# Usage:
+#   cd Social_Network_Microservice/call_service
+#   docker compose -f docker-compose.coturn.yml up -d
+#
+# Then start CallService with:
+#   export TURN_URL=turn:$(hostname -I | awk '{print $1}'):3478
+#   export TURN_USERNAME=turnuser
+#   export TURN_PASSWORD=turnpass
+#   ./mvnw spring-boot:run
+
+services:
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-port=3478
+      - --fingerprint
+      - --lt-cred-mech
+      - --user=turnuser:turnpass
+      - --realm=socialnetwork.local

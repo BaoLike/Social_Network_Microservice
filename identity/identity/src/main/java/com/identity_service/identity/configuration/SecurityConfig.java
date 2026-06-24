@@ -30,7 +30,10 @@ public class SecurityConfig {
         httpSecurity.authorizeHttpRequests(request -> request.
                 requestMatchers(HttpMethod.POST , PUBLIC_ENDPOINT)
                 .permitAll()
-                .requestMatchers(HttpMethod.GET , PUBLIC_ENDPOINT).permitAll()
+                .requestMatchers(HttpMethod.GET , PUBLIC_ENDPOINT)
+                .permitAll()
+                .requestMatchers(HttpMethod.PUT, PUBLIC_ENDPOINT)
+                .permitAll()
                 .anyRequest().authenticated()
         );
 

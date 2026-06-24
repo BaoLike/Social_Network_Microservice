@@ -40,6 +40,10 @@ public class User extends BaseAuditEntity {
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     UserStatus userStatus;
 
+    @Builder.Default
+    @Column(name = "locked", columnDefinition = "boolean default false", nullable = false)
+    boolean locked = false;
+
     @OneToMany(mappedBy = "users" , cascade = CascadeType.ALL , orphanRemoval = true)
     List<RefreshToken> tokens;
 

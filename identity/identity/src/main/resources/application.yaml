@@ -3,14 +3,31 @@ spring:
     name: identity-service
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: "jdbc:postgresql://localhost:5433/social_network_identity"
-    username: postgres
-    password: postgres
+    url: "jdbc:postgresql://localhost:5432/social_network_identity"
+    username: erp_user
+    password: 123456
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:socialnetwoking0906@gmail.com}
+    password: ${MAIL_PASSWORD:ythb bzpb jceo eqia}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            trust: smtp.gmail.com
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
   data:
     redis:
       host: redis-14597.c291.ap-southeast-2-1.ec2.cloud.redislabs.com
@@ -29,3 +46,6 @@ app:
   services:
     profile: http://localhost:8081/profile/info
     notify: http://localhost:8082/notification
+  mail:
+    # Bật tạm khi Gmail chưa cấu hình xong: OTP in ra log console, đăng ký vẫn thành công
+    fail-open: true

@@ -10,9 +10,10 @@ import com.chat.chat_service.mapper.ConversationMapper;
 import com.chat.chat_service.repository.ConservationRepository;
 import com.chat.chat_service.repository.httpclient.ProfileClient;
 import com.chat.chat_service.service.IConversationService;
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -20,12 +21,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.StringJoiner;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j(topic = "CHAT_SERVICE")
 public class ConversationService implements IConversationService {
-    ProfileClient profileClient;
+    private final ProfileClient profileClient;
     private final ConservationRepository conservationRepository;
     private final ConversationMapper conversationMapper;
     @Override
@@ -33,15 +36,21 @@ public class ConversationService implements IConversationService {
         // Fetch user infos
         String userId = SecurityContextHolder.getContext().getAuthentication().getName();
         var userInfoResponse = profileClient.getUserProfileById(userId);
+
         var participantInfoResponse = profileClient.getUserProfileById(
                 request.getParticipantIds().getFirst());
+
 
         if (Objects.isNull(userInfoResponse) || Objects.isNull(participantInfoResponse)) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
 
         var userInfo = userInfoResponse.getResult();
+        log.info("user dang active: {}{}", userInfo.getUserName(), userInfo.getAvatar());
+
         var participantInfo = participantInfoResponse.getResult();
+        log.info("user muon nhan den: {}{}", participantInfo.getUserName(), participantInfo.getAvatar());
+
 
         List<String> userIds = new ArrayList<>();
         userIds.add(userId);
@@ -50,20 +59,26 @@ public class ConversationService implements IConversationService {
         var sortedIds = userIds.stream().sorted().toList();
         String userIdHash = generateParticipantHash(sortedIds);
 
+        Optional<Conversation> existing = conservationRepository.findByParticipantHash(userIdHash);
+        if (existing.isPresent()) {
+            log.info("Reusing existing conversation for hash={}", userIdHash);
+            return toConversationResponse(existing.get());
+        }
+
         List<ParticipantInfo> participantInfos = List.of(
                 ParticipantInfo.builder()
                         .userId(userInfo.getUserId())
                         .userName(userInfo.getUserName())
                         //.firstName(userInfo.getFirstName())
                         //.lastName(userInfo.getLastName())
-                        //.avatar(userInfo.getAvatar())
+                        .avatar(userInfo.getAvatar())
                         .build(),
                 ParticipantInfo.builder()
                         .userId(participantInfo.getUserId())
                         .userName(participantInfo.getUserName())
                         //.firstName(participantInfo.getFirstName())
                         //.lastName(participantInfo.getLastName())
-                        //.avatar(participantInfo.getAvatar())
+                        .avatar(participantInfo.getAvatar())
                         .build()
         );
 
@@ -76,7 +91,13 @@ public class ConversationService implements IConversationService {
                 .participants(participantInfos)
                 .build();
 
-        conversation = conservationRepository.save(conversation);
+        try {
+            conversation = conservationRepository.save(conversation);
+        } catch (DuplicateKeyException ex) {
+            log.warn("Conversation race on hash={}, returning existing", userIdHash);
+            conversation = conservationRepository.findByParticipantHash(userIdHash)
+                    .orElseThrow(() -> ex);
+        }
 
         return toConversationResponse(conversation);
     }

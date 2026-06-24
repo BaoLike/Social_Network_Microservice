@@ -3,7 +3,9 @@ package com.story.ig.controller;
 import com.story.ig.dto.UserStoriesDTO;
 import com.story.ig.payload.request.HighlightStory;
 import com.story.ig.service.StoryService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,9 +16,8 @@ public class StoryController {
     StoryService storyService;
 
     @PostMapping("/post-story/{user-id}")
-    public ResponseEntity<?> postStory(@PathVariable("user-id") String userId, @RequestParam("media") MultipartFile media,
-                                       @RequestParam(value = "description", required = false) String description){
-        UserStoriesDTO response = storyService.PostStory(userId, media, description);
+    public ResponseEntity<?> postStory(@PathVariable("user-id") String userId, @RequestPart("media") MultipartFile media){
+        UserStoriesDTO response = storyService.PostStory(userId, media);
         if(response == null){
             return ResponseEntity.status(404).body("UserID not found");
         }
@@ -56,5 +57,10 @@ public class StoryController {
         else{
             return ResponseEntity.ok().body(response);
         }
+    }
+
+    @GetMapping("/get-stories")
+    public ResponseEntity<?> getStories(HttpServletRequest request){
+        return ResponseEntity.ok().body(storyService.getStory(request));
     }
 }

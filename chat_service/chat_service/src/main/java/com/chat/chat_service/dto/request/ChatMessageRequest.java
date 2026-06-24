@@ -15,4 +15,13 @@ public class ChatMessageRequest {
 
     @NotBlank
     String message;
+
+    String iv;
+
+    /** Plaintext preview for push notification only; not stored in DB. */
+    String notificationPreview;
+
+    String storyReplyMediaUrl;
+
+    String storyReplyOwnerId;
 }

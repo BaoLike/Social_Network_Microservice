@@ -16,7 +16,10 @@ public enum ErrorCode {
      VERIFY_EMAIL_TOKEN_INVALID(1012 , "Email token invalid" , HttpStatus.NOT_FOUND),
     EMAIL_NOT_VERIFIED(1013 , "Email not yet verify" , HttpStatus.NOT_FOUND) ,
     UNCATEGORIZED_EXCEPTION(9999 , "Exception not yet categorized" , HttpStatus.NOT_FOUND),
-    CONVERSATION_NOT_FOUND(1014, "Can not found conversation" ,HttpStatus.NOT_FOUND );
+    CONVERSATION_NOT_FOUND(1014, "Can not found conversation" ,HttpStatus.NOT_FOUND ),
+    MESSAGE_NOT_FOUND(1015, "Message not found", HttpStatus.NOT_FOUND),
+    MESSAGE_RECALL_FORBIDDEN(1016, "You can only recall your own messages", HttpStatus.FORBIDDEN),
+    MESSAGE_ALREADY_RECALLED(1017, "Message already recalled", HttpStatus.BAD_REQUEST);
 
     private final int code;
     private final String message;

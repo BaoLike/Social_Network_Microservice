@@ -10,4 +10,6 @@ public interface IChatService {
         ChatMessageResponse createChatMessage (ChatMessageRequest request);
 
     List<ChatMessageResponse> getAllMessages(String conversationId);
+
+    ChatMessageResponse recallMessage(String messageId);
 }

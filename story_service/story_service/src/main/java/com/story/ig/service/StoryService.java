@@ -8,6 +8,7 @@ import com.story.ig.model.Story;
 import com.story.ig.model.UserStories;
 import com.story.ig.payload.request.HighlightStory;
 import com.story.ig.repo.UserStoriesRepo;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -41,19 +42,23 @@ public class StoryService{
         UserStoriesRepo userStoriesRepo;
 
         @NonFinal
-        @Value("${app.services.identity}")
+        @Value("${app.services.profile:http://localhost:8081/profile/}")
+        String profileUrl;
+
+        @NonFinal
+        @Value("${app.services.identity:http://localhost:8080/identity/user}")
         String identityUrl;
 
 
-    public UserStoriesDTO PostStory(String userId, MultipartFile media, String description){
+    public UserStoriesDTO PostStory(String userId, MultipartFile media){
         if(!CheckUserExisted(userId)){
             throw new UserNotFoundException(userId);
         }
         try {
+            Map<String, Object> userInfor = getProfileById(userId);
             LocalDateTime date = LocalDateTime.now();
             StoryDTO storyDTO = new StoryDTO();
             storyDTO.setUrlMedia(uploadMediaToS3(userId, media));
-            storyDTO.setDescription(description);
             storyDTO.setCreateAt(date);
             storyDTO.setUserId(userId);
             storyDTO.setLiked(0l);
@@ -63,6 +68,9 @@ public class StoryService{
 
             if(userStoriesWrapper == null) {
                 UserStoriesDTO userStoriesDTO = new UserStoriesDTO();
+                userStoriesDTO.setFirstName(valueAsString(userInfor.get("firstName")));
+                userStoriesDTO.setLastName(valueAsString(userInfor.get("lastName")));
+                userStoriesDTO.setAvatar(valueAsString(userInfor.get("avatar")));
                 List<StoryDTO> listStories = new ArrayList<>();
                 listStories.add(storyDTO);
                 userStoriesDTO.setUserId(userId);
@@ -90,6 +98,23 @@ public class StoryService{
             throw new RuntimeException(e);
         }
     }
+
+    public List<UserStoriesDTO> getStory(HttpServletRequest request){
+        String authHeader = request.getHeader("Authorization");
+        List<UserStoriesDTO> userStoriesDTOList = new ArrayList<>();
+        List<String> userFollowedId = getUserIdFollowed(authHeader);
+        Cache cache = cacheManager.getCache("Stories");
+        for(String followedId: userFollowedId){
+            Cache.ValueWrapper userStoryValueWrapper = cache.get(followedId);
+            if(userStoryValueWrapper != null){
+                UserStoriesDTO userStoriesDTO = (UserStoriesDTO) userStoryValueWrapper.get();
+                userStoriesDTOList.add(userStoriesDTO);
+            }
+        }
+        return userStoriesDTOList;
+    }
+
+
     private String uploadMediaToS3(String userId,MultipartFile media) throws IOException {
         UUID uuid = UUID.randomUUID();
         String fileName = uuid.toString() + media.getName();
@@ -134,6 +159,9 @@ public class StoryService{
             UserStories userStories = userStoriesOptional.get();
             UserStoriesDTO userStoriesDTO = new UserStoriesDTO();
             userStoriesDTO.setUserId(userId);
+            userStoriesDTO.setAvatar(userStories.getAvatar());
+            userStoriesDTO.setFirstName(userStories.getFirstName());
+            userStoriesDTO.setLastName(userStories.getLastName());
             userStoriesDTO.setStories(userStories.getListStories().stream().map((story -> {
                 StoryDTO storyDTO = new StoryDTO();
                 storyDTO.setUrlMedia(story.getUrlMedia());
@@ -162,10 +190,13 @@ public class StoryService{
             throw new UserNotFoundException(highlightStory.getUserId());
         }
         else{
+            Map<String, Object> userInfor = getProfileById(highlightStory.getUserId());
             Optional<UserStories> userStoriesOptional = userStoriesRepo.findById(highlightStory.getUserId());
             DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
             UserStories userStories = new UserStories();
-
+            userStories.setAvatar(valueAsString(userInfor.get("avatar")));
+            userStories.setLastName(valueAsString("lastName"));
+            userStories.setFirstName(valueAsString(userInfor.get("firstName")));
             if(userStoriesOptional.isPresent()){
                 userStories = userStoriesOptional.get();
             }
@@ -204,5 +235,76 @@ public class StoryService{
         return codeIdentityService.equals("1000");
     }
 
+    public List<String> getUserIdFollowed(String authorizationHeader){
+        List<String> listUserId = new ArrayList<>();
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+//            log.warn("Missing Authorization header when calling profile service");
+            return listUserId;
+        }
+
+        HttpClient httpClient = HttpClient.newHttpClient();
+        String authHeader = authorizationHeader.startsWith("Bearer ")
+                ? authorizationHeader
+                : "Bearer " + authorizationHeader.trim();
+        HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(profileUrl + "getFollowed"))
+                .header("Authorization", authHeader)
+                .GET()
+                .build();
+
+        System.out.println("Request headers: " + httpRequest.headers());
+        try{
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            if (response.statusCode() != 200) {
+//                log.warn("Profile service returned non-200 status: {}", response.statusCode());
+                return listUserId;
+            }
+
+            Map<String, Object> datares = mapper.readValue(response.body(), Map.class);
+            System.out.println("data " + response.body());
+
+            Object resultObj = datares.get("result");
+            if (!(resultObj instanceof List<?> result)) {
+//                log.warn("Profile service returned empty or invalid result: {}", response.body());
+                return listUserId;
+            }
+
+            for (Object item : result) {
+                if (item instanceof Map<?, ?> user) {
+                    Object userId = user.get("userId");
+                    if (userId instanceof String userIdStr) {
+                        listUserId.add(userIdStr);
+                    }
+                }
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return listUserId;
+    }
+
+    private Map<String, Object> getProfileById(String userId){
+        HttpClient httpClient = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder(URI.create(profileUrl + "info/internal/profile/" + userId)).GET().build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Cannot get profile for userId: " + userId);
+            }
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            Map<String, Object> dataRes = mapper.readValue(response.body(), Map.class);
+            Object result = dataRes.get("result");
+            if (!(result instanceof Map<?, ?> resultMap)) {
+                throw new RuntimeException("Profile response format is invalid");
+            }
+            return (Map<String, Object>) resultMap;
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String valueAsString(Object value) {
+        return value == null ? null : value.toString();
+    }
 
 }

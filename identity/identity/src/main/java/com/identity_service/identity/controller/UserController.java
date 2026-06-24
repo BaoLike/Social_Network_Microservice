@@ -39,4 +39,12 @@ public class UserController {
                 .message("Delete user success")
                 .build();
     }
+
+    @PutMapping("/lock")
+    public ApiResponse<Void> lockUser(@RequestParam String userId){
+        userService.lockUser(userId);
+        return ApiResponse.<Void>builder()
+                .message("User locked")
+                .build();
+    }
 }

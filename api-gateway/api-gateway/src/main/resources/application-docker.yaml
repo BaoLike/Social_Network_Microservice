@@ -1,0 +1,52 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+  cloud:
+    gateway:
+      routes:
+        - id: identity
+          uri: http://identity:8080
+          predicates:
+            - Path=${app.api-prefix}/identity/**
+          filters:
+            - StripPrefix=2
+        - id: profile
+          uri: http://profile:8081
+          predicates:
+            - Path=${app.api-prefix}/profile/**
+          filters:
+            - StripPrefix=2
+        - id: notification
+          uri: http://notification:8082
+          predicates:
+            - Path=${app.api-prefix}/notification/**
+          filters:
+            - StripPrefix=2
+        - id: chat
+          uri: http://chat:8085
+          predicates:
+            - Path=${app.api-prefix}/chat/**
+          filters:
+            - StripPrefix=2
+        - id: story
+          uri: http://story:8086
+          predicates:
+            - Path=${app.api-prefix}/story/**
+          filters:
+            - StripPrefix=2
+        - id: post
+          uri: http://post:8087
+          predicates:
+            - Path=${app.api-prefix}/post/**
+          filters:
+            - StripPrefix=2
+        - id: call
+          uri: http://call:8088
+          predicates:
+            - Path=${app.api-prefix}/call/**
+          filters:
+            - StripPrefix=2
+
+app:
+  identity-url: http://identity:8080/identity

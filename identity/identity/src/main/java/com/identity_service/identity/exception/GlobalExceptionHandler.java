@@ -3,6 +3,7 @@ package com.identity_service.identity.exception;
 import com.identity_service.identity.dto.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -10,12 +11,20 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(value = Exception.class)
+    @ExceptionHandler(value = RuntimeException.class)
     ResponseEntity<ApiResponse> handlingRunTimeException(RuntimeException exception){
         ApiResponse apiResponse =new ApiResponse<>();
         apiResponse.setCode(9999);
         apiResponse.setMessage(exception.getMessage());
        return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiResponse> handlingMediaTypeNotSupported(HttpMediaTypeNotSupportedException exception){
+        ApiResponse apiResponse = new ApiResponse<>();
+        apiResponse.setCode(9999);
+        apiResponse.setMessage("Unsupported content type. Use application/json for /identity/user/create");
+        return ResponseEntity.badRequest().body(apiResponse);
     }
 
     @ExceptionHandler(value = AppException.class)

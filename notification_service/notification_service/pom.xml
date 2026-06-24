@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<spring-cloud.version>2023.0.1</spring-cloud.version>
+		<lombok.version>1.18.34</lombok.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -54,9 +55,13 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Mockito inline mock maker is default in Mockito 5 (mockito-core),
+		     so we don't need mockito-inline artifact. -->
+
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<version>${lombok.version}</version>
 			<optional>true</optional>
 		</dependency>
 
@@ -67,6 +72,31 @@
 			<version>4.10.3</version>
 			<scope>compile</scope>
 		</dependency>
+
+		<!-- Source: https://mvnrepository.com/artifact/com.google.firebase/firebase-admin -->
+		<dependency>
+			<groupId>com.google.firebase</groupId>
+			<artifactId>firebase-admin</artifactId>
+			<version>9.4.3</version>
+			<scope>compile</scope>
+		</dependency>
+
+		<!-- Ensure IDE/build resolves com.google.auth.oauth2.GoogleCredentials -->
+		<dependency>
+			<groupId>com.google.auth</groupId>
+			<artifactId>google-auth-library-credentials</artifactId>
+			<version>1.30.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.auth</groupId>
+			<artifactId>google-auth-library-oauth2-http</artifactId>
+			<version>1.30.1</version>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.persistence</groupId>
+			<artifactId>jakarta.persistence-api</artifactId>
+		</dependency>
+		<!-- spring-boot-autoconfigure is already brought transitively by Spring Boot starters -->
 
 	</dependencies>
 	<dependencyManagement>
@@ -91,8 +121,21 @@
 						<path>
 							<groupId>org.projectlombok</groupId>
 							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
 						</path>
 					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.5</version>
+				<configuration>
+					<trimStackTrace>false</trimStackTrace>
+					<systemPropertyVariables>
+						<!-- Allow ByteBuddy to run on newer JDKs (e.g., JDK 23) -->
+						<net.bytebuddy.experimental>true</net.bytebuddy.experimental>
+					</systemPropertyVariables>
 				</configuration>
 			</plugin>
 			<plugin>

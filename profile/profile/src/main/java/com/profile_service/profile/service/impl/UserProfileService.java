@@ -1,36 +1,119 @@
 package com.profile_service.profile.service.impl;
 
+import com.profile_service.profile.configuration.R2Config;
 import com.profile_service.profile.dto.request.ProfileCreationRequest;
+import com.profile_service.profile.dto.request.ProfileUpdateRequest;
+import com.profile_service.profile.dto.response.ProfileFullInfoResponse;
 import com.profile_service.profile.dto.response.UserProfileResponse;
 import com.profile_service.profile.entity.UserProfile;
 import com.profile_service.profile.exception.AppException;
 import com.profile_service.profile.exception.ErrorCode;
 import com.profile_service.profile.mapper.UserProfileMapper;
+import com.profile_service.profile.repository.FollowRepository;
 import com.profile_service.profile.repository.UserProfileRepository;
 import com.profile_service.profile.service.IUserProfileService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE , makeFinal = true)
+@Slf4j(topic = "PROFILE_SERVICE")
 public class UserProfileService  implements IUserProfileService {
+    private static final String DEFAULT_AVATAR_RESOURCE = "media/defaultavt.jpg";
+    private final String urlR2 = "https://pub-bd5ab7734dda491c8c8e7f89705ed9c2.r2.dev";
+    S3Client r2Client;
     UserProfileMapper userProfileMapper;
     UserProfileRepository userProfileRepository;
+    R2Config r2Config;
+    FollowRepository followRepository;
     @Override
     public UserProfileResponse createProfile(ProfileCreationRequest request) {
 
         UserProfile userProfile = userProfileMapper.convertUserProfileFromRequest(request);
+        userProfile.setAvatar(uploadDefaultAvatarToS3(userProfile.getUserId()));
 
         return userProfileMapper.convertResponseFromUserProfile(userProfileRepository.save(userProfile));
     }
 
     @Override
-    public UserProfileResponse getUserProfile(String id) {
-        UserProfile userProfile = userProfileRepository.findById(id).orElseThrow(() -> new RuntimeException());
-        return  userProfileMapper.convertResponseFromUserProfile(userProfile) ;
+    public UserProfileResponse updateProfile(ProfileUpdateRequest request) {
+
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        log.info("UserId:" + userId );
+        UserProfile userProfile = userProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+
+        userProfile.setFirstName(request.getFirstName());
+        userProfile.setLastName(request.getLastName());
+        userProfile.setDob(request.getDob());
+        userProfile.setAddress(request.getAddress());
+
+        return  userProfileMapper.convertResponseFromUserProfile(userProfileRepository.save(userProfile));
+    }
+
+    @Override
+    public UserProfileResponse updateAvatar(MultipartFile files) {
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        log.info("UserId cua user khi update avatar:" + userId );
+        UserProfile userProfile = userProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+
+        userProfile.setAvatar(uploadMediaToS3(userId , files));
+        return userProfileMapper.convertResponseFromUserProfile(userProfileRepository.save(userProfile));
+    }
+
+    @Override
+    public ProfileFullInfoResponse getUserProfile(String id) {
+
+        UserProfile userProfile = userProfileRepository.findByUserId(id).orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+         return  ProfileFullInfoResponse.builder()
+                .userId(userProfile.getUserId())
+                .userName(userProfile.getUserName())
+                .avatar(userProfile.getAvatar())
+                .firstName(userProfile.getFirstName())
+                .lastName(userProfile.getLastName())
+                .gender(userProfile.getGender())
+                .dob(userProfile.getDob())
+                .address(userProfile.getAddress())
+                .phone(userProfile.getPhone())
+                .follower(followRepository.countFollowers(id))
+                .followed(followRepository.countFollowing(id))
+                .publicKey(userProfile.getPublicKey())
+                .build();
+    }
+
+    @Override
+    public UserProfileResponse updatePublicKey(String publicKey) {
+        String userId = SecurityContextHolder.getContext().getAuthentication().getName();
+        UserProfile userProfile = userProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+        userProfile.setPublicKey(publicKey);
+        return userProfileMapper.convertResponseFromUserProfile(userProfileRepository.save(userProfile));
+    }
+
+    @Override
+    public UserProfileResponse getPublicKeyByUserId(String userId) {
+        UserProfile userProfile = userProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.PROFILE_NOT_FOUND));
+        return UserProfileResponse.builder()
+                .userId(userProfile.getUserId())
+                .publicKey(userProfile.getPublicKey())
+                .build();
     }
 
     @Override
@@ -40,4 +123,72 @@ public class UserProfileService  implements IUserProfileService {
 
         return userProfileMapper.convertResponseFromUserProfile(userProfile);
     }
+
+    @Override
+    public List<UserProfileResponse> searchUserByUserName(String keyword) {
+        List<UserProfile> lists = userProfileRepository.findUserByUserName(keyword);
+
+        return lists.stream().map(userProfileMapper::convertResponseFromUserProfile).toList();
+    }
+
+
+    private String uploadMediaToS3(String userId, MultipartFile media)  {
+        UUID uuid = UUID.randomUUID();
+        String originName = media.getOriginalFilename();
+        if (originName == null || originName.isBlank()) {
+            originName = "avatar.jpg";
+        }
+
+        String fileName = uuid + "-" + originName;
+        String dirName = String.format("avatar/%s/%s", userId, fileName);
+
+        try {
+            UploadPayload payload = resolveMediaPayload(media);
+            PutObjectRequest request = PutObjectRequest.builder().bucket(r2Config.getBucketName())
+                    .key(dirName)
+                    .contentType(payload.contentType())
+                    .contentLength(payload.contentLength())
+                    .build();
+            r2Client.putObject(request, RequestBody.fromInputStream(payload.inputStream(), payload.contentLength()));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return urlR2 + "/" + dirName;
+    }
+
+    private String uploadDefaultAvatarToS3(String userId) {
+        UUID uuid = UUID.randomUUID();
+        String fileName = uuid + "-defaultavt.jpg";
+        String dirName = String.format("avatar/%s/%s", userId, fileName);
+
+        try {
+            UploadPayload payload = resolveDefaultAvatarPayload();
+            PutObjectRequest request = PutObjectRequest.builder().bucket(r2Config.getBucketName())
+                    .key(dirName)
+                    .contentType(payload.contentType())
+                    .contentLength(payload.contentLength())
+                    .build();
+            r2Client.putObject(request, RequestBody.fromInputStream(payload.inputStream(), payload.contentLength()));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return urlR2 + "/" + dirName;
+    }
+
+    private UploadPayload resolveMediaPayload(MultipartFile media) throws IOException {
+        String contentType = media.getContentType() == null ? "application/octet-stream" : media.getContentType();
+        return new UploadPayload(media.getInputStream(), media.getSize(), contentType);
+    }
+
+    private UploadPayload resolveDefaultAvatarPayload() throws IOException {
+        ClassPathResource defaultAvatar = new ClassPathResource(DEFAULT_AVATAR_RESOURCE);
+        if (!defaultAvatar.exists()) {
+            throw new RuntimeException("Default avatar not found at classpath: " + DEFAULT_AVATAR_RESOURCE);
+        }
+        return new UploadPayload(defaultAvatar.getInputStream(), defaultAvatar.contentLength(), "image/jpeg");
+    }
+
+    private record UploadPayload(InputStream inputStream, long contentLength, String contentType) {
+    }
+
 }
