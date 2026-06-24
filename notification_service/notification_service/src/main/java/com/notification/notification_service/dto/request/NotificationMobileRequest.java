@@ -17,4 +17,8 @@ public class NotificationMobileRequest {
     String userNameSendMessage;
     String postId;
     String notificationType;
+    String callId;
+    String callerId;
+    String callerAvatar;
+    String conversationId;
 }

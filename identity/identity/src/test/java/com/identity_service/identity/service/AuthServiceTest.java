@@ -4,18 +4,25 @@ import com.identity_service.identity.dto.request.AuthRequest;
 import com.identity_service.identity.dto.request.IntroSpectRequest;
 import com.identity_service.identity.dto.request.LogOutRequest;
 import com.identity_service.identity.dto.request.RefreshTokenRequest;
+import com.identity_service.identity.dto.request.ForgotPasswordRequest;
+import com.identity_service.identity.dto.request.ResetPasswordRequest;
+import com.identity_service.identity.dto.request.ResendOtpRequest;
+import com.identity_service.identity.dto.request.VerifyEmailOtpRequest;
 import com.identity_service.identity.dto.response.AuthResponse;
 import com.identity_service.identity.dto.response.IntroSpectResponse;
 import com.identity_service.identity.exception.AppException;
 import com.identity_service.identity.exception.ErrorCode;
 import com.identity_service.identity.model.entity.EmailVerifyToken;
+import com.identity_service.identity.model.entity.PasswordResetToken;
 import com.identity_service.identity.model.entity.RefreshToken;
 import com.identity_service.identity.model.entity.User;
 import com.identity_service.identity.model.enums.UserStatus;
 import com.identity_service.identity.repository.EmailVerifyTokenRepository;
+import com.identity_service.identity.repository.PasswordResetTokenRepository;
 import com.identity_service.identity.repository.RefreshTokenRepository;
 import com.identity_service.identity.repository.UserRepository;
 import com.identity_service.identity.service.impl.AuthService;
+import com.identity_service.identity.service.impl.EmailOtpService;
 import com.identity_service.identity.service.impl.RedisTokenService;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -31,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -83,6 +91,10 @@ class AuthServiceTest {
     private RedisTokenService redisTokenService;
     @Mock
     private EmailVerifyTokenRepository emailVerifyTokenRepository;
+    @Mock
+    private EmailOtpService emailOtpService;
+    @Mock
+    private PasswordResetTokenRepository passwordResetTokenRepository;
 
     private User activeUser;
 
@@ -120,6 +132,27 @@ class AuthServiceTest {
         ErrorCode expected =
                 "ghost".equals(userName) ? ErrorCode.USER_NOT_EXIST : ErrorCode.AUTHENTICATED_FAILED;
         assertThat(ex.getErrorCode()).isEqualTo(expected);
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void authenticateUser_emailNotVerified_throws() {
+        User unverified = User.builder()
+                .userId(USER_ID)
+                .userName(USERNAME)
+                .email("john@example.com")
+                .password("encoded-hash")
+                .emailVerified(false)
+                .userStatus(UserStatus.INACTIVE)
+                .build();
+        when(userRepository.findByUserName(USERNAME)).thenReturn(Optional.of(unverified));
+        when(passwordEncoder.matches(RAW_PASSWORD, unverified.getPassword())).thenReturn(true);
+
+        AppException ex = assertThrows(
+                AppException.class,
+                () -> authService.authenticateUser(authRequest()));
+
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.EMAIL_NOT_VERIFIED);
         verify(refreshTokenRepository, never()).save(any());
     }
 
@@ -342,6 +375,134 @@ class AuthServiceTest {
         assertThat(pending.getUserStatus()).isEqualTo(UserStatus.ACTIVE);
         verify(userRepository).save(pending);
         verify(emailVerifyTokenRepository).delete(token);
+    }
+
+    @Test
+    void verifyEmailOtp_validOtp_activatesUser() {
+        User pending = User.builder()
+                .userId(USER_ID)
+                .userName(USERNAME)
+                .email("john@example.com")
+                .password("hash")
+                .emailVerified(false)
+                .userStatus(UserStatus.INACTIVE)
+                .build();
+        EmailVerifyToken token = EmailVerifyToken.builder()
+                .id("evt-1")
+                .emailVerifyToken("123456")
+                .users(pending)
+                .expiredAt(Instant.now().plus(10, ChronoUnit.MINUTES))
+                .build();
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(pending));
+        when(emailVerifyTokenRepository.findFirstByUsers_UserIdOrderByExpiredAtDesc(USER_ID))
+                .thenReturn(Optional.of(token));
+
+        authService.verifyEmailOtp(VerifyEmailOtpRequest.builder()
+                .email("john@example.com")
+                .otp("123456")
+                .build());
+
+        assertThat(pending.getEmailVerified()).isTrue();
+        assertThat(pending.getUserStatus()).isEqualTo(UserStatus.ACTIVE);
+        verify(userRepository).save(pending);
+        verify(emailVerifyTokenRepository).delete(token);
+    }
+
+    @Test
+    void verifyEmailOtp_wrongOtp_throws() {
+        User pending = User.builder()
+                .userId(USER_ID)
+                .userName(USERNAME)
+                .email("john@example.com")
+                .password("hash")
+                .emailVerified(false)
+                .userStatus(UserStatus.INACTIVE)
+                .build();
+        EmailVerifyToken token = EmailVerifyToken.builder()
+                .id("evt-1")
+                .emailVerifyToken("123456")
+                .users(pending)
+                .expiredAt(Instant.now().plus(10, ChronoUnit.MINUTES))
+                .build();
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(pending));
+        when(emailVerifyTokenRepository.findFirstByUsers_UserIdOrderByExpiredAtDesc(USER_ID))
+                .thenReturn(Optional.of(token));
+
+        AppException ex = assertThrows(AppException.class, () -> authService.verifyEmailOtp(
+                VerifyEmailOtpRequest.builder().email("john@example.com").otp("000000").build()));
+
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.OTP_INVALID);
+    }
+
+    @Test
+    void resendOtp_unverifiedUser_sendsNewOtp() {
+        User pending = User.builder()
+                .userId(USER_ID)
+                .userName(USERNAME)
+                .email("john@example.com")
+                .password("hash")
+                .emailVerified(false)
+                .userStatus(UserStatus.INACTIVE)
+                .build();
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(pending));
+
+        authService.resendOtp(ResendOtpRequest.builder().email("john@example.com").build());
+
+        verify(emailOtpService).sendVerificationOtp(pending);
+    }
+
+    @Test
+    void forgotPassword_existingEmail_sendsResetOtp() {
+        User user = User.builder()
+                .userId(USER_ID)
+                .userName(USERNAME)
+                .email("john@example.com")
+                .build();
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(user));
+
+        authService.forgotPassword(ForgotPasswordRequest.builder().email("john@example.com").build());
+
+        verify(emailOtpService).sendPasswordResetOtp(user);
+    }
+
+    @Test
+    void forgotPassword_unknownEmail_doesNothing() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        authService.forgotPassword(ForgotPasswordRequest.builder().email("ghost@example.com").build());
+
+        verify(emailOtpService, never()).sendPasswordResetOtp(any());
+    }
+
+    @Test
+    void resetPassword_validOtp_updatesPassword() {
+        User user = User.builder()
+                .userId(USER_ID)
+                .userName(USERNAME)
+                .email("john@example.com")
+                .password("old-hash")
+                .build();
+        PasswordResetToken token = PasswordResetToken.builder()
+                .id("prt-1")
+                .resetToken("654321")
+                .users(user)
+                .expiredAt(Instant.now().plus(10, ChronoUnit.MINUTES))
+                .build();
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(user));
+        when(passwordResetTokenRepository.findFirstByUsers_UserIdOrderByExpiredAtDesc(USER_ID))
+                .thenReturn(Optional.of(token));
+        when(passwordEncoder.encode("new-pass")).thenReturn("new-hash");
+
+        authService.resetPassword(ResetPasswordRequest.builder()
+                .email("john@example.com")
+                .otp("654321")
+                .newPassword("new-pass")
+                .build());
+
+        assertThat(user.getPassword()).isEqualTo("new-hash");
+        verify(userRepository).save(user);
+        verify(passwordResetTokenRepository).delete(token);
+        verify(refreshTokenRepository).deleteByUsers_UserId(USER_ID);
     }
 
     private static AuthRequest authRequest() {

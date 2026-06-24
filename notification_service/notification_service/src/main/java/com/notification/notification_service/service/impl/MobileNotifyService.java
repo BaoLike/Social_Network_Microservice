@@ -60,6 +60,11 @@ public class MobileNotifyService implements IMobileNotifyService {
             return;
         }
 
+        if ("INCOMING_CALL".equalsIgnoreCase(safeDataValue(request.getNotificationType()))) {
+            sendIncomingCallPush(request, tokens);
+            return;
+        }
+
         Notification notification = Notification.builder()
                 .setTitle(request.getTittle())
                 .setBody(request.getBody())
@@ -81,6 +86,34 @@ public class MobileNotifyService implements IMobileNotifyService {
         log.info("Push notification result userId={}, success={}, failed={}",
                 request.getUserId(), response.getSuccessCount(), response.getFailureCount());
 
+        handleFailedTokens(request.getUserId(), tokens, response);
+    }
+
+    private void sendIncomingCallPush(NotificationMobileRequest request, List<String> tokens)
+            throws FirebaseMessagingException {
+        MulticastMessage message = MulticastMessage.builder()
+                .addAllTokens(tokens)
+                .putData("recipientUserId", safeDataValue(request.getUserId()))
+                .putData("notificationType", "INCOMING_CALL")
+                .putData("callId", safeDataValue(request.getCallId()))
+                .putData("callerId", safeDataValue(request.getCallerId()))
+                .putData("callerName", safeDataValue(request.getUserNameSendMessage()))
+                .putData("callerAvatar", safeDataValue(request.getCallerAvatar()))
+                .putData("conversationId", safeDataValue(request.getConversationId()))
+                .putData("title", safeDataValue(request.getTittle()))
+                .putData("body", safeDataValue(request.getBody()))
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        .build())
+                .build();
+
+        BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
+        log.info("Incoming-call FCM userId={}, success={}, failed={}",
+                request.getUserId(), response.getSuccessCount(), response.getFailureCount());
+        handleFailedTokens(request.getUserId(), tokens, response);
+    }
+
+    private void handleFailedTokens(String userId, List<String> tokens, BatchResponse response) {
         List<SendResponse> responses = response.getResponses();
         for (int i = 0; i < responses.size() && i < tokens.size(); i++) {
             SendResponse sendResponse = responses.get(i);
@@ -94,11 +127,11 @@ public class MobileNotifyService implements IMobileNotifyService {
             MessagingErrorCode errorCode = exception == null ? null : exception.getMessagingErrorCode();
 
             log.warn("Push failed for userId={}, token={}, errorCode={}, message={}",
-                    request.getUserId(), token, errorCode, messageError);
+                    userId, token, errorCode, messageError);
 
             if (shouldRemoveToken(errorCode, messageError)) {
-                userDeviceRepository.deleteByUserIdAndDeviceToken(request.getUserId(), token);
-                log.info("Removed invalid device token for userId={}, token={}", request.getUserId(), token);
+                userDeviceRepository.deleteByUserIdAndDeviceToken(userId, token);
+                log.info("Removed invalid device token for userId={}, token={}", userId, token);
             }
         }
     }

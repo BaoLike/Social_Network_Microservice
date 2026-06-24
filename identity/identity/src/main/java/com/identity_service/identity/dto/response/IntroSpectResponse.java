@@ -11,4 +11,5 @@ import lombok.NoArgsConstructor;
 @Builder
 public class IntroSpectResponse {
     boolean isValid;
+    String userId;
 }

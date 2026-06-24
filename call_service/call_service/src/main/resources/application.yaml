@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: call_service
+  data:
+    mongodb:
+      uri: mongodb://root:root@localhost:27017/call-service?authSource=admin
+      auto-index-creation: true
+
+server:
+  port: 8088
+  servlet:
+    context-path: /call
+
+app:
+  service:
+    identity: http://localhost:8080/identity
+    notification: http://localhost:8082/notification
+  socket:
+    port: 8100
+  webrtc:
+    ice-servers:
+      - urls: stun:stun.l.google.com:19302
+      # TURN (NAT/4G): set env TURN_URL, TURN_USERNAME, TURN_PASSWORD before start
+      # Example: turn:172.20.10.2:3478 with coturn on the host
+      - urls: ${TURN_URL:}
+        username: ${TURN_USERNAME:}
+        credential: ${TURN_PASSWORD:}

@@ -10,6 +10,7 @@ import com.ig.PostService.model.Post;
 import com.ig.PostService.model.PostLike;
 import com.ig.PostService.payload.request.CommentRequest;
 import com.ig.PostService.payload.request.PostRequest;
+import com.ig.PostService.payload.request.UpdatePostRequest;
 import com.ig.PostService.payload.response.CommentResponse;
 import com.ig.PostService.payload.response.PostResponse;
 import com.ig.PostService.payload.response.UserPostProfileResponse;
@@ -22,15 +23,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.exceptions.JedisConnectionException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -50,9 +50,15 @@ import java.util.Base64;
 @Slf4j
 @Service
 public class PostService {
-    private final String identityUrl = "http://localhost:8080/identity/user";
-    private final String profileUrl = "http://localhost:8081/profile/";
-    private final String notificationUrl = "http://localhost:8082/notification";
+    @Value("${app.services.identity:http://localhost:8080/identity/user}")
+    private String identityUrl;
+    @Value("${app.services.profile:http://localhost:8081/profile/}")
+    private String profileUrl;
+    @Value("${app.services.notification:http://localhost:8082/notification}")
+    private String notificationUrl;
+    @Value("${app.services.ai:http://localhost:5000/check-post}")
+    private String aiCheckPostUrl;
+
     private static final int HTTP_RETRY_MAX = 3;
     @Autowired
     private S3Client r2Client;
@@ -74,6 +80,8 @@ public class PostService {
     private Mapper mapper;
     @Autowired
     private StringRedisTemplate redisTemplate;
+    @Autowired
+    private RedisConnectionFactory redisConnectionFactory;
 
     private final String urlR2 = "https://pub-bd5ab7734dda491c8c8e7f89705ed9c2.r2.dev";
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -123,6 +131,15 @@ public class PostService {
             log.warn("Redis connection was interrupted");
         }
         return mapper.PostResponseMapper(newPost);
+    }
+
+    public void recordViolationAttempt(String authorizationHeader, String reason) {
+        String userId = extractUserIdFromAuthorizationHeader(authorizationHeader);
+        String violationReason = (reason == null || reason.isBlank())
+                ? "Bài đăng vi phạm chính sách cộng đồng"
+                : reason;
+        postViolationService.trackViolation(
+                userId, violationReason, () -> lockUserAccount(userId));
     }
 
 
@@ -386,7 +403,7 @@ public class PostService {
     }
 
     private void checkPostWithAI(String description, MultipartFile media) {
-        String aiUrl = "http://localhost:5000/check-post";
+        String aiUrl = aiCheckPostUrl;
 
         try {
             org.springframework.util.MultiValueMap<String, Object> body =
@@ -654,13 +671,13 @@ public class PostService {
 
 
 
-    public boolean checkRedisConnection(){
-        JedisPool pool = new JedisPool();
-        try{
-            Jedis jesis = pool.getResource();
-            return true;
-        } catch (JedisConnectionException e){
-            return  false;
+    public boolean checkRedisConnection() {
+        try {
+            String pong = redisConnectionFactory.getConnection().ping();
+            return "PONG".equalsIgnoreCase(pong);
+        } catch (Exception e) {
+            log.warn("Redis connection check failed: {}", e.getMessage());
+            return false;
         }
     }
 
@@ -704,6 +721,41 @@ public class PostService {
                 commentRepo.save(comment);
             }
         }
+    }
+
+    public PostResponse updatePost(String postId, String authorizationHeader, UpdatePostRequest request) {
+        String userId = extractUserIdFromAuthorizationHeader(authorizationHeader);
+        if (!CheckUserExisted(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+        Post post = postRepo.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Bài viết không tồn tại: " + postId));
+        if (!userId.equals(post.getUserId())) {
+            throw new RuntimeException("Bạn không có quyền chỉnh sửa bài viết này");
+        }
+
+        String newDescription = request.getDescription();
+        if (newDescription != null && !newDescription.isBlank()) {
+            // Kiểm duyệt AI (chỉ text, không cần media)
+            try {
+                checkPostWithAI(newDescription, null);
+            } catch (PostViolationException e) {
+                postViolationService.trackViolation(
+                        userId, e.getMessage(), () -> lockUserAccount(userId));
+                throw e;
+            }
+        }
+
+        post.setDescription(newDescription);
+        postRepo.save(post);
+
+        // Xóa cache Redis để feed hiển thị đúng
+        if (checkRedisConnection()) {
+            Cache cache = cacheManager.getCache("Post");
+            cache.evict(userId);
+        }
+
+        return mapper.PostResponseMapper(post);
     }
 
     public void clearCache(){

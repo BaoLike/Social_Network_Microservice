@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+  data:
+    mongodb:
+      uri: mongodb://root:root@mongo:27017/chat-service?authSource=admin
+
+app:
+  service:
+    identity: http://identity:8080/identity
+    profile: http://profile:8081/profile/info
+    notification: http://notification:8082/notification

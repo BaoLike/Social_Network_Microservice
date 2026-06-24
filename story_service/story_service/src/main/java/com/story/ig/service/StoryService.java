@@ -40,10 +40,13 @@ public class StoryService{
         R2Config r2Config;
         CacheManager cacheManager;
         UserStoriesRepo userStoriesRepo;
-        private final String profileUrl = "http://localhost:8081/profile/";
 
         @NonFinal
-        @Value("${app.services.identity}")
+        @Value("${app.services.profile:http://localhost:8081/profile/}")
+        String profileUrl;
+
+        @NonFinal
+        @Value("${app.services.identity:http://localhost:8080/identity/user}")
         String identityUrl;
 
 

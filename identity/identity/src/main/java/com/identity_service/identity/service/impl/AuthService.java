@@ -4,16 +4,22 @@ import com.identity_service.identity.dto.request.AuthRequest;
 import com.identity_service.identity.dto.request.IntroSpectRequest;
 import com.identity_service.identity.dto.request.LogOutRequest;
 import com.identity_service.identity.dto.request.RefreshTokenRequest;
+import com.identity_service.identity.dto.request.ForgotPasswordRequest;
+import com.identity_service.identity.dto.request.ResetPasswordRequest;
+import com.identity_service.identity.dto.request.ResendOtpRequest;
+import com.identity_service.identity.dto.request.VerifyEmailOtpRequest;
 import com.identity_service.identity.dto.response.AuthResponse;
 import com.identity_service.identity.dto.response.IntroSpectResponse;
 import com.identity_service.identity.exception.AppException;
 import com.identity_service.identity.model.entity.EmailVerifyToken;
+import com.identity_service.identity.model.entity.PasswordResetToken;
 import com.identity_service.identity.model.entity.RefreshToken;
 import com.identity_service.identity.model.entity.User;
 import com.identity_service.identity.exception.ErrorCode;
 import com.identity_service.identity.model.enums.TokenType;
 import com.identity_service.identity.model.enums.UserStatus;
 import com.identity_service.identity.repository.EmailVerifyTokenRepository;
+import com.identity_service.identity.repository.PasswordResetTokenRepository;
 import com.identity_service.identity.repository.RefreshTokenRepository;
 import com.identity_service.identity.repository.UserRepository;
 import com.identity_service.identity.service.IAuthService;
@@ -47,6 +53,8 @@ public class AuthService implements IAuthService {
     RefreshTokenRepository refreshTokenRepository;
     RedisTokenService redisTokenService;
     EmailVerifyTokenRepository emailVerifyTokenRepository;
+    EmailOtpService emailOtpService;
+    PasswordResetTokenRepository passwordResetTokenRepository;
     protected  static String secretKey = "bc4ab14dbbb049a77290ca0196a37d597d399a4fd5d8ccf2b831191d1995e84e";
 
     @Override
@@ -60,6 +68,9 @@ public class AuthService implements IAuthService {
         boolean authenticate = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if(!authenticate){
             throw  new AppException(ErrorCode.AUTHENTICATED_FAILED);
+        }
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new AppException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
         // Kiểm tra tài khoản bị khóa
         if (user.isLocked()) {
@@ -94,17 +105,15 @@ public class AuthService implements IAuthService {
     @Override
     public IntroSpectResponse introspectToken(IntroSpectRequest request) {
         var token = request.getToken();
-        boolean isValid = true;
-
         try {
-            verifyToken(token);
+            SignedJWT signedJWT = verifyToken(token);
+            return IntroSpectResponse.builder()
+                    .isValid(true)
+                    .userId(signedJWT.getJWTClaimsSet().getSubject())
+                    .build();
         } catch (JOSEException | ParseException e) {
-            isValid = false;
             throw new AppException(ErrorCode.TOKEN_INVALID);
         }
-        return IntroSpectResponse.builder()
-                .isValid(isValid)
-                .build();
     }
 
     @Override
@@ -186,6 +195,85 @@ public class AuthService implements IAuthService {
         //Verify success thi delete emailverifytoken
 
         emailVerifyTokenRepository.delete(emailVerifyToken);
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmailOtp(VerifyEmailOtpRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
+
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            return;
+        }
+
+        EmailVerifyToken emailVerifyToken = emailVerifyTokenRepository
+                .findFirstByUsers_UserIdOrderByExpiredAtDesc(user.getUserId())
+                .orElseThrow(() -> new AppException(ErrorCode.VERIFY_EMAIL_TOKEN_INVALID));
+
+        if (emailVerifyToken.getExpiredAt().isBefore(Instant.now())) {
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
+
+        if (!emailVerifyToken.getEmailVerifyToken().equals(request.getOtp())) {
+            throw new AppException(ErrorCode.OTP_INVALID);
+        }
+
+        user.setUserStatus(UserStatus.ACTIVE);
+        user.setEmailVerified(true);
+        userRepository.save(user);
+        emailVerifyTokenRepository.delete(emailVerifyToken);
+    }
+
+    @Override
+    @Transactional
+    public void resendOtp(ResendOtpRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
+
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            return;
+        }
+
+        emailOtpService.sendVerificationOtp(user);
+    }
+
+    @Override
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            return;
+        }
+        userRepository.findByEmail(request.getEmail().trim())
+                .ifPresent(emailOtpService::sendPasswordResetOtp);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
+            throw new AppException(ErrorCode.PASSWORD_INVALID);
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXIST));
+
+        PasswordResetToken resetToken = passwordResetTokenRepository
+                .findFirstByUsers_UserIdOrderByExpiredAtDesc(user.getUserId())
+                .orElseThrow(() -> new AppException(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
+
+        if (resetToken.getExpiredAt().isBefore(Instant.now())) {
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
+
+        if (!resetToken.getResetToken().equals(request.getOtp())) {
+            throw new AppException(ErrorCode.OTP_INVALID);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        passwordResetTokenRepository.delete(resetToken);
+        refreshTokenRepository.deleteByUsers_UserId(user.getUserId());
     }
 
 

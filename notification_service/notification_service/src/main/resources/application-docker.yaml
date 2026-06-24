@@ -1,0 +1,10 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+  data:
+    mongodb:
+      uri: mongodb://root:root@mongo:27017/notification-service?authSource=admin
+
+app:
+  verification-link-base: ${VERIFICATION_LINK_BASE:http://localhost:8888/api/v1/identity}

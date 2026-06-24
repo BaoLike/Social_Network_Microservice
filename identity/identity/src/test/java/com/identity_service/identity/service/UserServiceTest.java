@@ -2,19 +2,16 @@ package com.identity_service.identity.service;
 
 import com.identity_service.identity.dto.request.ProfileCreationRequest;
 import com.identity_service.identity.dto.request.UserCreationRequest;
-import com.identity_service.identity.dto.request.VerifyEmailRequest;
 import com.identity_service.identity.dto.response.UserResponse;
 import com.identity_service.identity.exception.AppException;
 import com.identity_service.identity.exception.ErrorCode;
 import com.identity_service.identity.mapper.UserMapper;
 import com.identity_service.identity.mapper.UserProfileMapper;
-import com.identity_service.identity.model.entity.EmailVerifyToken;
 import com.identity_service.identity.model.entity.User;
 import com.identity_service.identity.model.enums.UserStatus;
-import com.identity_service.identity.repository.EmailVerifyTokenRepository;
 import com.identity_service.identity.repository.UserRepository;
-import com.identity_service.identity.repository.httpclient.NotificationClient;
 import com.identity_service.identity.repository.httpclient.ProfileClient;
+import com.identity_service.identity.service.impl.EmailOtpService;
 import com.identity_service.identity.service.impl.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,9 +58,7 @@ class UserServiceTest {
     @Mock
     private ProfileClient profileClient;
     @Mock
-    private NotificationClient notificationClient;
-    @Mock
-    private EmailVerifyTokenRepository emailVerifyTokenRepository;
+    private EmailOtpService emailOtpService;
 
     private UserCreationRequest creationRequest;
     private User mappedUser;
@@ -147,15 +142,13 @@ class UserServiceTest {
 
             assertThat(result).isEqualTo(mappedResponse);
             verify(userRepository).save(mappedUser);
-            verify(emailVerifyTokenRepository).save(any(EmailVerifyToken.class));
-            verify(notificationClient).verifyEmailUser(any(VerifyEmailRequest.class));
+            verify(emailOtpService).sendVerificationOtp(savedUser);
             verify(profileClient).createProfile(any(ProfileCreationRequest.class));
         } else {
             AppException ex = assertThrows(AppException.class, () -> userService.createUser(creationRequest));
             assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.USER_EXISTED);
             verify(userRepository, never()).save(any());
-            verify(emailVerifyTokenRepository, never()).save(any());
-            verify(notificationClient, never()).verifyEmailUser(any());
+            verify(emailOtpService, never()).sendVerificationOtp(any());
             verify(profileClient, never()).createProfile(any());
         }
     }
@@ -171,13 +164,7 @@ class UserServiceTest {
 
         userService.createUser(creationRequest);
 
-        ArgumentCaptor<EmailVerifyToken> tokenCaptor = ArgumentCaptor.forClass(EmailVerifyToken.class);
-        verify(emailVerifyTokenRepository).save(tokenCaptor.capture());
-        assertThat(tokenCaptor.getValue().getUsers()).isEqualTo(savedUser);
-
-        ArgumentCaptor<VerifyEmailRequest> notifyCaptor = ArgumentCaptor.forClass(VerifyEmailRequest.class);
-        verify(notificationClient).verifyEmailUser(notifyCaptor.capture());
-        assertThat(notifyCaptor.getValue().getToken()).isEqualTo(tokenCaptor.getValue().getEmailVerifyToken());
+        verify(emailOtpService).sendVerificationOtp(savedUser);
 
         ArgumentCaptor<ProfileCreationRequest> profileCaptor = ArgumentCaptor.forClass(ProfileCreationRequest.class);
         verify(profileClient).createProfile(profileCaptor.capture());

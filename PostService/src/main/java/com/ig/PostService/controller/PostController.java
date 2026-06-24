@@ -4,7 +4,9 @@ import com.ig.PostService.exception.AccountLockedException;
 import com.ig.PostService.exception.PostViolationException;
 import com.ig.PostService.payload.request.CommentRequest;
 import com.ig.PostService.payload.request.PostRequest;
+import com.ig.PostService.payload.request.UpdatePostRequest;
 import com.ig.PostService.payload.request.UserReuest;
+import com.ig.PostService.payload.request.ViolationReportRequest;
 import com.ig.PostService.payload.response.ApiResponse;
 import com.ig.PostService.payload.response.PostResponse;
 import com.ig.PostService.payload.response.UserPostProfileResponse;
@@ -28,6 +30,23 @@ public class PostController {
     public ResponseEntity<?> createPost(@RequestPart("data") PostRequest request, @RequestPart("media") MultipartFile media){
         try {
             return ResponseEntity.ok().body(postService.CreateNewPost(request, media));
+        } catch (AccountLockedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse("403", e.getMessage()));
+        } catch (PostViolationException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse("400", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/violation")
+    public ResponseEntity<?> reportViolation(@RequestBody ViolationReportRequest request,
+                                             HttpServletRequest httpRequest) {
+        try {
+            postService.recordViolationAttempt(
+                    httpRequest.getHeader("Authorization"),
+                    request != null ? request.getReason() : null);
+            return ResponseEntity.ok(new ApiResponse("200", "Đã ghi nhận vi phạm"));
         } catch (AccountLockedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new ApiResponse("403", e.getMessage()));
@@ -75,6 +94,25 @@ public class PostController {
     public void unlikeComment(@PathVariable("comment-id") Long commentId,
                               HttpServletRequest request) {
         postService.unlikeComment(commentId, request.getHeader("Authorization"));
+    }
+
+    @PutMapping("/update/{post-id}")
+    public ResponseEntity<?> updatePost(@PathVariable("post-id") String postId,
+                                        @RequestBody UpdatePostRequest request,
+                                        HttpServletRequest httpRequest) {
+        try {
+            return ResponseEntity.ok(postService.updatePost(
+                    postId, httpRequest.getHeader("Authorization"), request));
+        } catch (AccountLockedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse("403", e.getMessage()));
+        } catch (PostViolationException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse("400", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse("400", e.getMessage()));
+        }
     }
 
     @PostMapping("/clear-cache")
