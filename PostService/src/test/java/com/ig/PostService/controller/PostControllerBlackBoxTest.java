@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,7 +39,7 @@ class PostControllerBlackBoxTest {
     @Test
     void createPost_multipart_returns200_andDelegatesToService() throws Exception {
         // Keep createAt null to avoid requiring JavaTimeModule configuration in this standalone blackbox test.
-        PostRequest postRequest = new PostRequest("u1", "hello", null, 0L);
+        PostRequest postRequest = new PostRequest("u1", "hello", null, 0L, null);
         MockMultipartFile dataPart = new MockMultipartFile(
                 "data",
                 "data.json",
@@ -103,7 +103,7 @@ class PostControllerBlackBoxTest {
 
     @Test
     void commentPost_returns200_andDelegates() throws Exception {
-        CommentRequest req = new CommentRequest("u1", "nice");
+        CommentRequest req = new CommentRequest("u1", "nice", null);
 
         mockMvc.perform(
                         put("/comment/p1")
@@ -128,7 +128,7 @@ class PostControllerBlackBoxTest {
     void getPost_returns200_andBodyFromService() throws Exception {
         PostResponse p = new PostResponse();
         p.setId("p1");
-        when(postService.getPost(any())).thenReturn(Set.of(p));
+        when(postService.getPost(any())).thenReturn(List.of(p));
 
         mockMvc.perform(get("/get-post").header("Authorization", "Bearer token"))
                 .andExpect(status().isOk())

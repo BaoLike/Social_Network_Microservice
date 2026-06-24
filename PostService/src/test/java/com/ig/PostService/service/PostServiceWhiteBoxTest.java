@@ -157,8 +157,8 @@ class PostServiceWhiteBoxTest {
         doReturn(false).when(service).checkRedisConnection();
         doReturn(List.of()).when(service).getUserIdFollowed(anyString());
 
-        Post p1 = new Post("p1", "owner", null, null, null, "u", "d", 0L, LocalDateTime.now(), "m", List.of());
-        Post p2 = new Post("p2", "owner", null, null, null, "u", "d", 0L, LocalDateTime.now(), "m", List.of());
+        Post p1 = new Post("p1", "owner", null, null, null, "u", "d", 0L, LocalDateTime.now(), "m", null, List.of());
+        Post p2 = new Post("p2", "owner", null, null, null, "u", "d", 0L, LocalDateTime.now(), "m", null, List.of());
         when(postRepo.findAll()).thenReturn(List.of(p1, p2));
         when(postLikeRepo.findLikedPostIdsByUserIdAndPostIds(eq("u1"), anySet()))
                 .thenReturn(Set.of("p2"));
@@ -166,7 +166,7 @@ class PostServiceWhiteBoxTest {
         HttpServletRequest req = mock(HttpServletRequest.class);
         when(req.getHeader("Authorization")).thenReturn("Bearer " + fakeJwtWithSub("u1"));
 
-        Set<PostResponse> out = service.getPost(req);
+        List<PostResponse> out = service.getPost(req);
 
         assertThat(out).hasSize(2);
         assertThat(out.stream().filter(r -> "p2".equals(r.getId())).findFirst().orElseThrow().getLikedByUser())
