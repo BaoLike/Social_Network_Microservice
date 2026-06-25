@@ -28,12 +28,14 @@ com/call/call_service/repository/httpclient/IdentityClient.class
 com/call/call_service/entity/CallSession$CallSessionBuilder.class
 com/call/call_service/configuration/SocketIOConfig.class
 com/call/call_service/dto/request/NotificationMobileRequest$NotificationMobileRequestBuilder.class
+com/call/call_service/config/KafkaConfig.class
 com/call/call_service/dto/request/InitiateCallRequest$InitiateCallRequestBuilder.class
 com/call/call_service/entity/CallSession.class
 com/call/call_service/service/impl/SignalingService.class
 com/call/call_service/dto/response/IceServerResponse$IceServerConfig.class
 com/call/call_service/exception/ErrorCode.class
 com/call/call_service/entity/CallStatus.class
+com/call/call_service/kafka/CallKafkaEventPublisher.class
 com/call/call_service/dto/response/IntrospectResponse$IntrospectResponseBuilder.class
 com/call/call_service/configuration/CallJwtHelper.class
 com/call/call_service/service/impl/CallWebSocketSessionService.class

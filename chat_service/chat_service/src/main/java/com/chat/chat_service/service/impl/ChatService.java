@@ -8,6 +8,7 @@ import com.chat.chat_service.entity.Conversation;
 import com.chat.chat_service.entity.ParticipantInfo;
 import com.chat.chat_service.exception.AppException;
 import com.chat.chat_service.exception.ErrorCode;
+import com.chat.chat_service.kafka.ChatKafkaEventPublisher;
 import com.chat.chat_service.mapper.ChatMapper;
 import com.chat.chat_service.repository.ChatMessageRepository;
 import com.chat.chat_service.repository.ConservationRepository;
@@ -18,6 +19,7 @@ import com.corundumstudio.socketio.SocketIOServer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +41,12 @@ public class ChatService implements IChatService {
 
     @Autowired(required = false)
     private SocketIOServer socketIOServer;
+
+    @Autowired(required = false)
+    private ChatKafkaEventPublisher chatKafkaEventPublisher;
+
+    @Value("${app.kafka.enabled:false}")
+    private boolean kafkaEnabled;
 
     @Override
     public ChatMessageResponse createChatMessage(ChatMessageRequest request) {
@@ -94,13 +102,21 @@ public class ChatService implements IChatService {
                 .findFirst()
                 .ifPresent(receiver -> {
                     try {
-                        notificationClient.sendMobileNotification(
-                                NotificationMobileRequest.builder()
-                                        .userId(receiver.getUserId())
-                                        .tittle(profile.getUserName())
-                                        .body(resolveNotificationBody(request))
-                                        .build()
-                        );
+                        if (kafkaEnabled && chatKafkaEventPublisher != null) {
+                            chatKafkaEventPublisher.publishChatPush(
+                                    receiver.getUserId(),
+                                    profile.getUserName(),
+                                    resolveNotificationBody(request),
+                                    request.getConversationId());
+                        } else {
+                            notificationClient.sendMobileNotification(
+                                    NotificationMobileRequest.builder()
+                                            .userId(receiver.getUserId())
+                                            .tittle(profile.getUserName())
+                                            .body(resolveNotificationBody(request))
+                                            .build()
+                            );
+                        }
                     } catch (Exception e) {
                         log.warn("Failed to send push notification: {}", e.getMessage());
                     }

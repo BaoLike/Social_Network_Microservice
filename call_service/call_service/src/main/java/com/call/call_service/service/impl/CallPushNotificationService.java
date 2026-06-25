@@ -2,11 +2,15 @@ package com.call.call_service.service.impl;
 
 import com.call.call_service.dto.request.NotificationMobileRequest;
 import com.call.call_service.entity.CallSession;
+import com.call.call_service.kafka.CallKafkaEventPublisher;
 import com.call.call_service.repository.httpclient.NotificationClient;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -19,6 +23,14 @@ public class CallPushNotificationService {
 
     NotificationClient notificationClient;
     SignalingService signalingService;
+
+    @NonFinal
+    @Autowired(required = false)
+    CallKafkaEventPublisher callKafkaEventPublisher;
+
+    @NonFinal
+    @Value("${app.kafka.enabled:false}")
+    boolean kafkaEnabled;
 
     public void notifyIncomingCallIfOffline(CallSession session) {
         if (session == null || session.getCalleeId() == null) {
@@ -46,7 +58,11 @@ public class CallPushNotificationService {
                 .build();
 
         try {
-            notificationClient.sendMobileNotification(request);
+            if (kafkaEnabled && callKafkaEventPublisher != null) {
+                callKafkaEventPublisher.publishIncomingCall(session, callerLabel);
+            } else {
+                notificationClient.sendMobileNotification(request);
+            }
             log.info("Sent incoming-call FCM to userId={} callId={}", session.getCalleeId(), session.getId());
         } catch (Exception e) {
             log.warn("FCM incoming call failed for userId={}: {}", session.getCalleeId(), e.getMessage());

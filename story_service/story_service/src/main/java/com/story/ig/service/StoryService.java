@@ -4,6 +4,7 @@ import com.story.ig.config.R2Config;
 import com.story.ig.dto.StoryDTO;
 import com.story.ig.dto.UserStoriesDTO;
 import com.story.ig.exception.UserNotFoundException;
+import com.story.ig.kafka.StoryKafkaEventPublisher;
 import com.story.ig.model.Story;
 import com.story.ig.model.UserStories;
 import com.story.ig.payload.request.HighlightStory;
@@ -49,6 +50,14 @@ public class StoryService{
         @Value("${app.services.identity:http://localhost:8080/identity/user}")
         String identityUrl;
 
+        @NonFinal
+        @org.springframework.beans.factory.annotation.Autowired(required = false)
+        StoryKafkaEventPublisher storyKafkaEventPublisher;
+
+        @NonFinal
+        @Value("${app.kafka.enabled:false}")
+        boolean kafkaEnabled;
+
 
     public UserStoriesDTO PostStory(String userId, MultipartFile media){
         if(!CheckUserExisted(userId)){
@@ -62,6 +71,10 @@ public class StoryService{
             storyDTO.setCreateAt(date);
             storyDTO.setUserId(userId);
             storyDTO.setLiked(0l);
+
+            if (kafkaEnabled && storyKafkaEventPublisher != null) {
+                storyKafkaEventPublisher.publishStoryCreated(userId, storyDTO.getUrlMedia());
+            }
 
             Cache userStoriesCache = cacheManager.getCache("Stories");
             Cache.ValueWrapper userStoriesWrapper = userStoriesCache.get(userId);

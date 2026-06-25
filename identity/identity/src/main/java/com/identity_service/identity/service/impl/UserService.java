@@ -10,6 +10,7 @@ import com.identity_service.identity.model.entity.User;
 import com.identity_service.identity.exception.ErrorCode;
 import com.identity_service.identity.model.enums.UserStatus;
 import com.identity_service.identity.repository.UserRepository;
+import com.identity_service.identity.kafka.IdentityEventPublisher;
 import com.identity_service.identity.repository.httpclient.ProfileClient;
 import com.identity_service.identity.service.IUserService;
 import com.identity_service.identity.service.impl.EmailOtpService;
@@ -18,6 +19,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,6 +33,13 @@ public class UserService implements IUserService {
     UserProfileMapper profileMapper;
     ProfileClient profileClient;
     EmailOtpService emailOtpService;
+
+    @Autowired(required = false)
+    IdentityEventPublisher identityEventPublisher;
+
+    @Value("${app.kafka.enabled:false}")
+    boolean kafkaEnabled;
+
     @Override
     @Transactional
     public UserResponse createUser(UserCreationRequest request) {
@@ -41,15 +51,23 @@ public class UserService implements IUserService {
 
         var u = userRepository.save(user);
 
-        emailOtpService.sendVerificationOtp(u);
+        if (kafkaEnabled && identityEventPublisher != null) {
+            String otp = emailOtpService.createVerificationOtp(u);
+            identityEventPublisher.publishUserRegistered(u, request);
+            identityEventPublisher.publishEmailVerifyRequested(u, otp);
+            log.info("Registration events published for userId={}", u.getUserId());
+        } else {
+            emailOtpService.sendVerificationOtp(u);
+            ProfileCreationRequest profileRequest = profileMapper.convertFromUserCreationRequest(request);
+            profileRequest.setUserId(u.getUserId());
+            try {
+                profileClient.createProfile(profileRequest);
+            } catch (Exception e) {
+                log.warn("Profile create skipped for userId={}: {}", u.getUserId(), e.getMessage());
+            }
+        }
 
-        //Goi den profile service
-        ProfileCreationRequest profileRequest = profileMapper.convertFromUserCreationRequest(request);
-        profileRequest.setUserId(u.getUserId());
-
-        profileClient.createProfile(profileRequest);
-
-        return userMapper.convertResponseFromUser(u) ;
+        return userMapper.convertResponseFromUser(u);
     }
 
     @Override

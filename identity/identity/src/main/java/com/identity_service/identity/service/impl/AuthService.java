@@ -21,6 +21,7 @@ import com.identity_service.identity.model.enums.UserStatus;
 import com.identity_service.identity.repository.EmailVerifyTokenRepository;
 import com.identity_service.identity.repository.PasswordResetTokenRepository;
 import com.identity_service.identity.repository.RefreshTokenRepository;
+import com.identity_service.identity.kafka.IdentityEventPublisher;
 import com.identity_service.identity.repository.UserRepository;
 import com.identity_service.identity.service.IAuthService;
 import com.nimbusds.jose.*;
@@ -33,7 +34,10 @@ import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -55,6 +59,15 @@ public class AuthService implements IAuthService {
     EmailVerifyTokenRepository emailVerifyTokenRepository;
     EmailOtpService emailOtpService;
     PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @NonFinal
+    @Autowired(required = false)
+    IdentityEventPublisher identityEventPublisher;
+
+    @NonFinal
+    @Value("${app.kafka.enabled:false}")
+    boolean kafkaEnabled;
+
     protected  static String secretKey = "bc4ab14dbbb049a77290ca0196a37d597d399a4fd5d8ccf2b831191d1995e84e";
 
     @Override
@@ -192,9 +205,8 @@ public class AuthService implements IAuthService {
         user.setUserStatus(UserStatus.ACTIVE);
         user.setEmailVerified(true);
         userRepository.save(user);
-        //Verify success thi delete emailverifytoken
-
         emailVerifyTokenRepository.delete(emailVerifyToken);
+        publishEmailVerifiedIfKafka(user);
     }
 
     @Override
@@ -223,6 +235,13 @@ public class AuthService implements IAuthService {
         user.setEmailVerified(true);
         userRepository.save(user);
         emailVerifyTokenRepository.delete(emailVerifyToken);
+        publishEmailVerifiedIfKafka(user);
+    }
+
+    private void publishEmailVerifiedIfKafka(User user) {
+        if (kafkaEnabled && identityEventPublisher != null) {
+            identityEventPublisher.publishEmailVerified(user);
+        }
     }
 
     @Override
@@ -235,7 +254,12 @@ public class AuthService implements IAuthService {
             return;
         }
 
-        emailOtpService.sendVerificationOtp(user);
+        if (kafkaEnabled && identityEventPublisher != null) {
+            String otp = emailOtpService.createVerificationOtp(user);
+            identityEventPublisher.publishEmailVerifyRequested(user, otp);
+        } else {
+            emailOtpService.sendVerificationOtp(user);
+        }
     }
 
     @Override

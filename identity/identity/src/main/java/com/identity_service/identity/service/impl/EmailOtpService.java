@@ -45,7 +45,8 @@ public class EmailOtpService {
     @Value("${app.mail.fail-open:false}")
     boolean mailFailOpen;
 
-    public void sendVerificationOtp(User user) {
+    /** Tạo và lưu OTP; trả về mã để publish Kafka (notification gửi mail async). */
+    public String createVerificationOtp(User user) {
         emailVerifyTokenRepository.deleteByUsers_UserId(user.getUserId());
 
         String otp = generateOtp();
@@ -55,7 +56,11 @@ public class EmailOtpService {
                 .expiredAt(Instant.now().plus(OTP_EXPIRY_MINUTES, ChronoUnit.MINUTES))
                 .build();
         emailVerifyTokenRepository.save(token);
+        return otp;
+    }
 
+    public void sendVerificationOtp(User user) {
+        String otp = createVerificationOtp(user);
         sendOtpEmail(user.getEmail(), user.getUserName(), otp);
     }
 

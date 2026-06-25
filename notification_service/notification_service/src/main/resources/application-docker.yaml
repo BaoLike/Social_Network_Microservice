@@ -5,6 +5,23 @@ spring:
   data:
     mongodb:
       uri: mongodb://root:root@mongo:27017/notification-service?authSource=admin
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
 
 app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}
+  mail:
+    fail-open: true
   verification-link-base: ${VERIFICATION_LINK_BASE:http://localhost:8888/api/v1/identity}

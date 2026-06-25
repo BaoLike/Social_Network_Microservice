@@ -7,3 +7,9 @@ spring:
     authentication:
       username: neo4j
       password: ${NEO4J_PASSWORD:12345678}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+
+app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}

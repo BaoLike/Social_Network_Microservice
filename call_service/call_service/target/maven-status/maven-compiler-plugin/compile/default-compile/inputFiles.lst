@@ -1,4 +1,5 @@
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/CallServiceApplication.java
+/home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/config/KafkaConfig.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/configuration/CallJwtHelper.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/configuration/CustomJwtDecoder.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/configuration/JwtAuthenticationEntryPoint.java
@@ -21,6 +22,7 @@
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/exception/AppException.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/exception/ErrorCode.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/exception/GlobalExceptionHandler.java
+/home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/kafka/CallKafkaEventPublisher.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/repository/CallSessionRepository.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/repository/CallWebSocketSessionRepository.java
 /home/baolai/MobileFinalFinal/Social_Network_Microservice/call_service/call_service/src/main/java/com/call/call_service/repository/httpclient/IdentityClient.java

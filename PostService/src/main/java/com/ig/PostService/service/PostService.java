@@ -51,7 +51,8 @@ import java.util.Base64;
  * Post service. Kiểm duyệt AI khi tạo/sửa bài ({@link #checkPostWithAI}) luôn chạy
  * <strong>đồng bộ</strong> qua HTTP tới ai-server — không qua Kafka, vì app phải
  * nhận kết quả ngay và user xác nhận trách nhiệm khi claim chưa verify (unverifiedInfo).
- * Kafka (phase sau) chỉ áp dụng cho side-effect async: {@link #notifyPostInteraction}.
+ * Kafka chỉ áp dụng cho side-effect async: {@link #notifyPostInteraction} →
+ * topic {@code notification.interaction.created}.
  *
  * @see docs/kafka/EVENT-DRIVEN-ARCHITECTURE.md §2.4
  */
@@ -90,6 +91,12 @@ public class PostService {
     private StringRedisTemplate redisTemplate;
     @Autowired
     private RedisConnectionFactory redisConnectionFactory;
+
+    @Autowired(required = false)
+    private com.ig.PostService.kafka.PostKafkaEventPublisher postKafkaEventPublisher;
+
+    @Value("${app.kafka.enabled:false}")
+    private boolean kafkaEnabled;
 
     private final String urlR2 = "https://pub-bd5ab7734dda491c8c8e7f89705ed9c2.r2.dev";
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -785,11 +792,46 @@ public class PostService {
         }
         try {
             Map<String, Object> profile = getProfileById(actorUserId);
+            String firstName = valueAsString(profile.get("firstName"));
+            String lastName = valueAsString(profile.get("lastName"));
+
+            if (kafkaEnabled && postKafkaEventPublisher != null) {
+                com.common_library.common.kafka.payload.NotificationInteractionCreatedPayload payload =
+                        com.common_library.common.kafka.payload.NotificationInteractionCreatedPayload.builder()
+                                .recipientUserId(recipientUserId)
+                                .actorUserId(actorUserId)
+                                .actorFirstName(firstName)
+                                .actorLastName(lastName)
+                                .type(type)
+                                .postId(postId)
+                                .build();
+                postKafkaEventPublisher.publishInteraction(payload);
+
+                if ("LIKE".equalsIgnoreCase(type)) {
+                    postKafkaEventPublisher.publishPostLiked(
+                            com.common_library.common.kafka.payload.PostLikedPayload.builder()
+                                    .postId(postId)
+                                    .postOwnerId(recipientUserId)
+                                    .actorId(actorUserId)
+                                    .likedAt(java.time.Instant.now().toString())
+                                    .build());
+                } else if ("COMMENT".equalsIgnoreCase(type)) {
+                    postKafkaEventPublisher.publishPostCommented(
+                            com.common_library.common.kafka.payload.PostCommentedPayload.builder()
+                                    .postId(postId)
+                                    .postOwnerId(recipientUserId)
+                                    .commenterId(actorUserId)
+                                    .commentedAt(java.time.Instant.now().toString())
+                                    .build());
+                }
+                return;
+            }
+
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("recipientUserId", recipientUserId);
             payload.put("actorUserId", actorUserId);
-            payload.put("actorFirstName", valueAsString(profile.get("firstName")));
-            payload.put("actorLastName", valueAsString(profile.get("lastName")));
+            payload.put("actorFirstName", firstName);
+            payload.put("actorLastName", lastName);
             payload.put("type", type);
             payload.put("postId", postId);
 

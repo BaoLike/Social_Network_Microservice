@@ -5,8 +5,12 @@ spring:
   data:
     mongodb:
       uri: mongodb://root:root@mongo:27017/chat-service?authSource=admin
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
 
 app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}
   service:
     identity: http://identity:8080/identity
     profile: http://profile:8081/profile/info

@@ -12,8 +12,12 @@ spring:
       username: ${REDIS_USERNAME:default}
       ssl:
         enabled: ${REDIS_SSL:false}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
 
 app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}
   services:
     profile: http://profile:8081/profile/info
     notify: http://notification:8082/notification
