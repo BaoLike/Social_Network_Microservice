@@ -5,58 +5,8 @@ app:
 spring:
   application:
     name: api-gateway
-  cloud:
-    gateway:
-      routes:
-        - id: identity
-          uri: http://localhost:8080
-          predicates:
-            - Path=${app.api-prefix}/identity/**
-          filters:
-            - StripPrefix=2
-
-        - id: profile
-          uri: http://localhost:8081
-          predicates:
-            - Path=${app.api-prefix}/profile/**
-          filters:
-            - StripPrefix=2
-
-        - id: notification
-          uri: http://localhost:8082
-          predicates:
-            - Path=${app.api-prefix}/notification/**
-          filters:
-            - StripPrefix=2
-
-        - id: chat
-          uri: http://localhost:8085
-          predicates:
-            - Path=${app.api-prefix}/chat/**
-          filters:
-            - StripPrefix=2
-
-        - id: story
-          uri: http://localhost:8086
-          predicates:
-            - Path=${app.api-prefix}/story/**
-          filters:
-            - StripPrefix=2
-
-        - id: post
-          uri: http://localhost:8087
-          predicates:
-            - Path=${app.api-prefix}/post/**
-          filters:
-            - StripPrefix=2
-
-        - id: call
-          uri: http://localhost:8088
-          predicates:
-            - Path=${app.api-prefix}/call/**
-          filters:
-            - StripPrefix=2
+  profiles:
+    default: local
 
 server:
   port: 8888
-

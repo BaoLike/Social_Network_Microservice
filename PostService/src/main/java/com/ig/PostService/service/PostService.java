@@ -47,6 +47,14 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.Base64;
 
+/**
+ * Post service. Kiểm duyệt AI khi tạo/sửa bài ({@link #checkPostWithAI}) luôn chạy
+ * <strong>đồng bộ</strong> qua HTTP tới ai-server — không qua Kafka, vì app phải
+ * nhận kết quả ngay và user xác nhận trách nhiệm khi claim chưa verify (unverifiedInfo).
+ * Kafka (phase sau) chỉ áp dụng cho side-effect async: {@link #notifyPostInteraction}.
+ *
+ * @see docs/kafka/EVENT-DRIVEN-ARCHITECTURE.md §2.4
+ */
 @Slf4j
 @Service
 public class PostService {
@@ -402,6 +410,10 @@ public class PostService {
         return "image" + ext;
     }
 
+    /**
+     * Kiểm duyệt nội dung bài đăng — bắt buộc sync trong cùng request tạo post.
+     * Không publish Kafka: vi phạm phải reject ngay trước khi lưu DB.
+     */
     private void checkPostWithAI(String description, MultipartFile media) {
         String aiUrl = aiCheckPostUrl;
 
@@ -763,6 +775,10 @@ public class PostService {
         cache.clear();
     }
 
+    /**
+     * Thông báo like/comment — candidate chuyển sang Kafka topic
+     * {@code notification.interaction.created} (không ảnh hưởng luồng đăng bài).
+     */
     private void notifyPostInteraction(String recipientUserId, String actorUserId, String postId, String type) {
         if (recipientUserId == null || actorUserId == null || recipientUserId.equals(actorUserId)) {
             return;
